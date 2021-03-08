@@ -1,0 +1,81 @@
+---
+title: "2014 UCSB Campus Climate Project: Bootstrapped Confidence Interval"
+author: "Genevieve Chiong"
+date: "3/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse) 
+library(boot)
+```
+
+```{r}
+# 22 out of 36 surveyed UCSB community members (61%) identifying as nonbinary/genderqueer responded they had personally experienced "exclusionary, offensive, hostile or intimidating conduct" 
+
+# Create a vector reflecting the survey data (n = 36) where 0 equals an individual response of no and 1 equals a response of yes
+survey <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+hist(survey)
+```
+
+
+```{r}
+# Create a function that calculates the proportion of a specified outcome (genderqueer individuals experiencing exclusionary conduct) for each bootstrap sample
+prop_fun <- function (x,i) {sum(x[i])/36}
+
+# Create 10000 bootstrap samples by resampling from the vector (survey) using the function created (prop_fun) to calculate the proportion of genderqueer individuals experiencing exclusionary conduct based on the 2014 UCSB survey data
+prop_boot <- boot(survey,
+                  statistic = prop_fun,
+                  R = 10000)
+
+prop_boot
+```
+
+```{r}
+# View original sample proportion
+#prop_boot$t0
+
+# View proportion for each of the bootstrap samples 
+#prop_boot$t
+```
+
+```{r}
+# Make vectors of bootstrap sample proportions a data frame
+prop_boot_df <- data.frame(bs_prop = prop_boot$t)
+
+# Histogram of 10k bootstrap sample proportions
+ggplot(data = prop_boot_df,
+       aes(x = bs_prop)) +
+  geom_histogram(bins = 22) +
+  labs(x = "\nProportion of genderqueer individuals who experienced exclusionary conduct",
+       y = "Count\n")
+
+# Find the 95% confidence interval for the bootstrapped distribution
+boot.ci(prop_boot, conf = 0.95)
+```
+
+The bootstrapped 95% confidence interval of (0.45, 0.77) means that we expect that 95 of 100 calculated confidence intervals will contain the actual population parameter, which in this context is the proportion of genderqueer individuals experiencing exclusionary conduct based on the 2014 UCSB survey data. 
+
+
+### Citations
+
+2014 UCSB Campus Climate Project Final Report (prepared by Rankin & Associates Consulting, available at http://campusclimate.ucop.edu/_common/files/pdf-climate/ucsb-full-report.pdf).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,5 @@
 ---
-title: "Santa Barbara Coastal stream chemistry: agglomerative hierarchal clustering"
+title: "Santa Barbara Coastal Stream Chemistry: Agglomerative Hierarchical Clustering by Site"
 author: "Genevieve Chiong"
 date: "3/3/2021"
 output: html_document
@@ -23,7 +23,7 @@ library(ggdendro)
 # Read in the data 
 stream_chem <- read_csv(here("data", "sbc_lter_registered_stream_chemistry.csv"))
 
-# Wrangle the data so that there is a single summary row per site (based on means from all observations at that site) 
+# Wrangle the data so that there is a single summary row per site (based on means from all observations at that site) and convert -999 values to NA
 stream_chem[stream_chem < 0] <- NA
 
 stream_chem_summary <- stream_chem %>% 
@@ -48,7 +48,7 @@ stream_chem_summary[stream_chem_summary == "NaN"] <- NA
 stream_chem_complete <- stream_chem_summary %>% 
   drop_na(mean_nh4:mean_spec)
 
-# Scale the numeric variables (columns 2:10)
+# Scale the numeric variables (columns 2:11)
 stream_chem_complete_scaled <- stream_chem_complete %>% 
   select(2:11) %>% 
   scale()
@@ -62,20 +62,17 @@ rownames(stream_chem_complete_scaled) <- stream_chem_complete$site_code
 # Compute dissimilarity values (Euclidean distances): 
 euc_distance <- dist(stream_chem_complete_scaled, method = "euclidean")
 
-euc_distance
+#euc_distance
 
-# Hierarchical clustering (complete linkage)
+# Agglomerative hierarchical clustering (complete linkage) for water chemistry by site
 hc_complete <- hclust(euc_distance,
                       method = "complete")
 
-plot(hc_complete, cex = 0.6, hang = -1)
-```
-
-```{r}
-ggdendrogram(hc_complete,
-             rotate = TRUE) + 
+# Create a dendrogram showing multivariate clustering for water chemistry by site
+ggdendrogram(hc_complete) +
   theme_minimal() + 
-  labs(x = "Site")
+  labs(x = "\nSite",
+       y = "Height\n")
 ```
 
 

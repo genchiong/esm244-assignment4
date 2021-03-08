@@ -1,5 +1,5 @@
 ---
-title: "Parameter Estimation - Global Wild Fish Catch"
+title: "Global Wild Fish Catch from 1950-2012: Parameter Estimation Using Nonlinear Least Squares"
 author: "Genevieve Chiong"
 date: "3/3/2021"
 output: html_document
@@ -11,18 +11,17 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(tidyverse)
 library(here)
 library(boot)
-library(gt)
-library(patchwork)
 library(broom)
 library(nlstools)
+library(kableExtra)
 ```
 
 
 ```{r}
-# Read in the data
+# Read in the data and clean 
 fish_catch <- read_csv(here("data", "fish_catch.csv")) %>% 
   rename("year" = "World Wild Fish Catch and Farmed Fish Production, 1950-2012",
-         "wild_catch_mill_t" = "X2",
+         "wild_catch" = "X2",
          "farmed_fish" = "X3", 
          "total_fish_production" = "X4") %>% 
    slice(-c(1, 2, 3, 4))
@@ -30,43 +29,34 @@ fish_catch <- read_csv(here("data", "fish_catch.csv")) %>%
 # Remove empty rows at bottom of dataset
 fish_catch_na <- na.omit(fish_catch)
 
-# Convert the year column class from character to numeric 
+# Convert all column class from character to numeric 
 fish_catch_numeric <- as.data.frame(apply(fish_catch_na, 2, as.numeric))
 
 # Create a new column with years starting at 0 instead of 1950 
 fish_catch_clean <- fish_catch_numeric %>% 
-  mutate(time = (year - 1950))
+  mutate(year_new = (year - min(year)))
 ```
 
 
 ```{r}
 # Exploratory graph of wild catch over time
 ggplot(data = fish_catch_clean,
-       aes(x = time,
-           y = wild_catch_mill_t)) +
+       aes(x = year_new,
+           y = wild_catch)) +
   geom_point() +
   theme_minimal() +
   labs(x = "Time (years)", 
        y = "Wild Fish Catch (million tons)")
-
-# Log transformed data
-ggplot(data = fish_catch_clean, 
-       aes(x = time, 
-           y = log(wild_catch_mill_t))) +
-  geom_point() +
-  theme_minimal() +
-  labs(x = "Time (years)", 
-       y = "ln(wild fish catch)")
 ```
 
 ```{r}
 # Estimate the growth rate constant (k) *during exponential growth phase 
 fish_catch_clean_exp <- fish_catch_clean %>% 
-  filter(time < 20) %>% 
-  mutate(ln_wild_catch = log(wild_catch_mill_t))
+  filter(year_new < 20) %>% 
+  mutate(ln_wild_catch = log(wild_catch))
 
 # Model linear to get *k* estimate (the slope of this linear equation is an estimate of the growth rate constant) 
-lm_k <- lm(ln_wild_catch ~ time, data = fish_catch_clean_exp)
+lm_k <- lm(ln_wild_catch ~ year_new, data = fish_catch_clean_exp)
 lm_k # Coefficient (k) ~ 0.058
 ```
 
@@ -76,21 +66,32 @@ The trend for the global wild fish catch from 1950 - 2012 follows logistic growt
 - $A$ is $\frac{K-P_0}{P_0}$
 - $k$ is the growth rate constant
 
-The initial estimates for the parameters in the model are $K$ = 93 , $A$ = 15, and $k$ = 0.058. 
+The initial estimates for the parameters in the model are $K$ = 95, $A$ = 5.33, and $k$ = 0.058. 
 
 ```{r}
-# Nonlinear least squares
-fish_catch_nls <- nls(wild_catch_mill_t ~ K/(1 + A*exp(-r*time)),
+# Use nonlinear least squares to find parameters for model describing wild catch 
+fish_catch_nls <- nls(wild_catch ~ K/(1 + A*exp(-r*year_new)),
                       data = fish_catch_clean,
-                      start = list(K = 93, A = 15, r = 0.058),
+                      start = list(K = 93, A = 5.33, r = 0.058),
                       trace = TRUE)
 
 # Model summary (null hypothesis: parameter value = 0)
 summary(fish_catch_nls)
 
 # Use broom::functions to get model outputs in tidier format
-model_out <- broom::tidy(fish_catch_nls)
-fish_catch_nls
+fish_catch_nls_tidy <- broom::tidy(fish_catch_nls) %>% 
+  mutate_if(is.numeric, round, 2)
+
+fish_catch_nls_tidy$p.value[fish_catch_nls_tidy$p.value < 0.001] <- "<0.001"
+
+kable(fish_catch_nls_tidy,
+      col.names = c("Term",
+                    "Estimate",
+                    "Standard Error",
+                    "Statistic",
+                    "P-value")) %>% 
+  kable_styling(bootstrap_options = "striped",
+                full_width = FALSE) 
 ```
 The parameters for the model describing wild catch is $$P(t) = \frac{100.28}{1+4.32e^{-0.07t}}$$
 
@@ -98,7 +99,7 @@ where
 
 - $K$ = 100.28 million tons of fish
 - $A$ = 4.32 
-- $k$ = 0.07 million tons of fish / year
+- $k$ = 0.07 million tons of fish/year
 
 
 ```{r}
@@ -109,15 +110,15 @@ p_predict <- predict(fish_catch_nls)
 fish_catch_complete <- data.frame(fish_catch_clean, p_predict)
 
 # Plot them all together to visualize model over original observed values 
-ggplot( data = fish_catch_complete,
-        aes(x = time,
-            y = wild_catch_mill_t)) +
+ggplot(data = fish_catch_complete,
+        aes(x = year_new,
+            y = wild_catch)) +
   geom_point(color = "orange") + 
-  geom_line(aes(x = time,
+  geom_line(aes(x = year_new,
                 y = p_predict),
             color = "cadetblue4") + 
   labs(x = "\nTime (years)", 
-       y = "Wild Fish Catch \n(millions of tons)\n") +
+       y = "Wild Fish Catch \n(million tons)\n") +
   ylim(0, 105) +
   xlim(0, 63) +
   theme_minimal() 
